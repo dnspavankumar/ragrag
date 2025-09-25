@@ -5,6 +5,8 @@ import speech_recognition as sr
 import pyttsx3
 from RAG_Gmail import load_emails, ask_question
 import time
+import random
+from datetime import datetime, timedelta
 
 print("Starting application...")  # Debug print
 
@@ -135,7 +137,7 @@ class GmailAssistantUI:
         print("Initializing GmailAssistantUI...")  # Debug print
         self.root = root
         self.root.title("Gmail Assistant")
-        self.root.geometry("1000x700")
+        self.root.geometry("1400x800")  # Increased width for sidebar
         self.root.configure(bg="#1e1e2e")  # Catppuccin Base
         
         # Initialize variables
@@ -149,6 +151,12 @@ class GmailAssistantUI:
         
         # Create header
         self.create_header()
+        
+        # Create main container with sidebar
+        self.create_main_container()
+        
+        # Create sidebar
+        self.create_sidebar()
         
         # Create main layout
         self.create_main_layout()
@@ -206,14 +214,166 @@ class GmailAssistantUI:
                                     width=80, height=30, bg="#313244")  # Surface0
         new_chat_btn.pack(side='right', padx=20, pady=15)
     
-    def create_main_layout(self):
-        # Main container
-        main_container = tk.Frame(self.root, bg="#1e1e2e")  # Base
-        main_container.pack(expand=True, fill='both', padx=20, pady=(0, 20))
+    def create_main_container(self):
+        # Main container that holds sidebar and chat area
+        self.main_container = tk.Frame(self.root, bg="#1e1e2e")
+        self.main_container.pack(expand=True, fill='both')
         
-        # Chat area
-        chat_container = tk.Frame(main_container, bg="#1e1e2e")  # Base
-        chat_container.pack(expand=True, fill='both', pady=(0, 20))
+        # Create right side container for chat + input
+        self.right_container = tk.Frame(self.main_container, bg="#1e1e2e")
+        self.right_container.pack(side='right', expand=True, fill='both')
+    
+    def create_sidebar(self):
+        # Sidebar frame
+        sidebar = tk.Frame(self.main_container, bg="#313244", width=350)
+        sidebar.pack(side='left', fill='y', padx=(0, 1))
+        sidebar.pack_propagate(False)
+        
+        # Sidebar content with proper scrolling
+        self.sidebar_canvas = tk.Canvas(sidebar, bg="#313244", highlightthickness=0)
+        self.sidebar_frame = tk.Frame(self.sidebar_canvas, bg="#313244")
+        
+        # Pack canvas without visible scrollbar
+        self.sidebar_canvas.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Create window in canvas
+        self.sidebar_window = self.sidebar_canvas.create_window((0, 0), window=self.sidebar_frame, anchor="nw")
+        
+        # Financial Overview Section
+        self.create_financial_section(self.sidebar_frame)
+        
+        # Task Checklist Section
+        self.create_task_section(self.sidebar_frame)
+        
+        # Bind events for proper scrolling
+        self.sidebar_frame.bind('<Configure>', self.on_sidebar_frame_configure)
+        self.sidebar_canvas.bind('<Configure>', self.on_sidebar_canvas_configure)
+        self.sidebar_canvas.bind_all("<MouseWheel>", self.on_sidebar_mousewheel)
+    
+    def on_sidebar_frame_configure(self, event):
+        self.sidebar_canvas.configure(scrollregion=self.sidebar_canvas.bbox("all"))
+    
+    def on_sidebar_canvas_configure(self, event):
+        canvas_width = event.width
+        self.sidebar_canvas.itemconfig(self.sidebar_window, width=canvas_width)
+    
+    def on_sidebar_mousewheel(self, event):
+        # Only scroll sidebar if mouse is over it
+        widget = event.widget.winfo_containing(event.x_root, event.y_root)
+        if widget and str(widget).startswith(str(self.sidebar_canvas)):
+            # Get current scroll position for boundary checking
+            top, bottom = self.sidebar_canvas.yview()
+            scroll_direction = int(-1*(event.delta/120))
+            
+            # Prevent scrolling beyond boundaries
+            if scroll_direction < 0 and top <= 0:
+                return
+            if scroll_direction > 0 and bottom >= 1:
+                return
+                
+            self.sidebar_canvas.yview_scroll(scroll_direction, "units")
+    
+    def create_financial_section(self, parent):
+        # Financial Overview Header
+        fin_header = tk.Label(parent, text="Financial Overview", bg="#313244", fg="#cdd6f4",
+                             font=("JetBrains Mono", 14, "bold"))
+        fin_header.pack(anchor='w', pady=(0, 10))
+        
+        # Mock financial data (in rupees)
+        credits = [25000, 32000, 28000, 41000, 35000, 29000, 38000]
+        debits = [18000, 21000, 24000, 22000, 26000, 23000, 25000]
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        
+        # Graph canvas
+        graph_canvas = tk.Canvas(parent, width=320, height=200, bg="#45475a", highlightthickness=0)
+        graph_canvas.pack(pady=(0, 20))
+        
+        # Draw simple bar chart
+        max_val = max(max(credits), max(debits))
+        bar_width = 20
+        spacing = 40
+        
+        for i, (credit, debit) in enumerate(zip(credits, debits)):
+            x = 30 + i * spacing
+            
+            # Credit bars (green)
+            credit_height = (credit / max_val) * 120
+            graph_canvas.create_rectangle(x, 170 - credit_height, x + bar_width, 170,
+                                        fill="#a6e3a1", outline="")
+            
+            # Debit bars (red)
+            debit_height = (debit / max_val) * 120
+            graph_canvas.create_rectangle(x + bar_width + 2, 170 - debit_height, 
+                                        x + 2 * bar_width + 2, 170,
+                                        fill="#f38ba8", outline="")
+            
+            # Day labels
+            graph_canvas.create_text(x + bar_width, 185, text=days[i], 
+                                   fill="#cdd6f4", font=("JetBrains Mono", 8))
+        
+        # Legend
+        graph_canvas.create_rectangle(50, 20, 60, 30, fill="#a6e3a1", outline="")
+        graph_canvas.create_text(70, 25, text="Credits", anchor='w', fill="#cdd6f4", 
+                               font=("JetBrains Mono", 8))
+        
+        graph_canvas.create_rectangle(50, 35, 60, 45, fill="#f38ba8", outline="")
+        graph_canvas.create_text(70, 40, text="Debits", anchor='w', fill="#cdd6f4", 
+                               font=("JetBrains Mono", 8))
+        
+        # Balance summary
+        total_credits = sum(credits)
+        total_debits = sum(debits)
+        balance = total_credits - total_debits
+        
+        balance_frame = tk.Frame(parent, bg="#45475a")
+        balance_frame.pack(fill='x', pady=(0, 20))
+        
+        tk.Label(balance_frame, text=f"Weekly Balance: ₹{balance:,}", 
+                bg="#45475a", fg="#a6e3a1" if balance > 0 else "#f38ba8",
+                font=("JetBrains Mono", 11, "bold")).pack(pady=10)
+    
+    def create_task_section(self, parent):
+        # Task Checklist Header
+        task_header = tk.Label(parent, text="Tasks & Updates", bg="#313244", fg="#cdd6f4",
+                              font=("JetBrains Mono", 14, "bold"))
+        task_header.pack(anchor='w', pady=(0, 10))
+        
+        # Task list frame
+        task_frame = tk.Frame(parent, bg="#45475a")
+        task_frame.pack(fill='x', pady=(0, 20))
+        
+        # Mock tasks
+        tasks = [
+            ("Portfolio Review", True),
+            ("Update Investment Strategy", False),
+            ("Review Bank Statements", True),
+            ("Tax Document Preparation", False),
+            ("Insurance Policy Review", False),
+            ("Budget Analysis", True)
+        ]
+        
+        for task, completed in tasks:
+            task_row = tk.Frame(task_frame, bg="#45475a")
+            task_row.pack(fill='x', padx=10, pady=5)
+            
+            # Checkbox
+            checkbox = tk.Label(task_row, text="✓" if completed else "☐", 
+                              bg="#45475a", fg="#a6e3a1" if completed else "#6c7086",
+                              font=("JetBrains Mono", 12))
+            checkbox.pack(side='left')
+            
+            # Task text
+            task_label = tk.Label(task_row, text=task, bg="#45475a", 
+                                fg="#6c7086" if completed else "#cdd6f4",
+                                font=("JetBrains Mono", 9))
+            task_label.pack(side='left', padx=(10, 0))
+    
+
+    
+    def create_main_layout(self):
+        # Chat area (inside right container)
+        chat_container = tk.Frame(self.right_container, bg="#1e1e2e")  # Base
+        chat_container.pack(expand=True, fill='both', padx=20, pady=(0, 0))
         
         # Custom chat display using Canvas for smooth scrolling (no scrollbar)
         self.chat_canvas = tk.Canvas(chat_container, bg="#1e1e2e", highlightthickness=0)  # Base
@@ -231,49 +391,49 @@ class GmailAssistantUI:
         self.chat_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
     
     def create_input_area(self):
-        # Input container
-        input_container = tk.Frame(self.root, bg="#1e1e2e", height=120)  # Base
-        input_container.pack(fill='x', side='bottom', padx=20, pady=(0, 20))
+        # Input container (inside right container only - no overlap with sidebar)
+        input_container = tk.Frame(self.right_container, bg="#1e1e2e", height=80)
+        input_container.pack(fill='x', side='bottom', padx=20, pady=20)
         input_container.pack_propagate(False)
         
-        # Input frame with border
-        input_frame = tk.Frame(input_container, bg="#313244", relief='solid', bd=1)  # Surface0
-        input_frame.pack(fill='both', expand=True, ipady=2)
+        # Input row with text field and buttons
+        input_row = tk.Frame(input_container, bg="#313244", relief='flat', bd=0)
+        input_row.pack(fill='both', expand=True)
         
-        # Input field
-        self.input_field = tk.Text(input_frame, wrap=tk.WORD, height=3, 
-                                 bg="#313244", fg="#cdd6f4", font=self.input_font,  # Surface0, Text
-                                 insertbackground="#cdd6f4", relief='flat', bd=10)  # Text cursor
-        self.input_field.pack(fill='both', expand=True, padx=10, pady=10)
+        # Input field (single line style)
+        self.input_field = tk.Entry(input_row, bg="#313244", fg="#cdd6f4", 
+                                   font=("JetBrains Mono", 12), relief='flat', bd=0,
+                                   insertbackground="#cdd6f4")
+        self.input_field.pack(side='left', fill='both', expand=True, padx=20, pady=15)
         
-        # Input field placeholder
-        self.input_placeholder = "Type your message... (Press Enter to send, Ctrl+Enter for new line)"
+        # Input placeholder
+        self.input_placeholder = "Type your message here..."
         self.show_placeholder()
         self.input_field.bind('<FocusIn>', self.hide_placeholder)
         self.input_field.bind('<FocusOut>', self.show_placeholder)
+        self.input_field.bind('<Return>', self.handle_enter_key)
         
-        # Button container
-        button_container = tk.Frame(input_container, bg="#1e1e2e")  # Base
-        button_container.pack(fill='x', pady=(10, 0))
+        # Voice button
+        voice_btn = tk.Button(input_row, text="🎤", bg="#313244", fg="#6c7086",
+                             font=("JetBrains Mono", 14), relief='flat', bd=0,
+                             command=self.start_voice_input, padx=10)
+        voice_btn.pack(side='right', padx=(0, 10))
         
-        # Buttons with modern styling
-        self.send_button = AnimatedButton(button_container, "Send Message", self.send_message, 
-                                        width=120, height=35, bg="#1e1e2e")  # Base
-        self.send_button.pack(side='right', padx=(10, 0))
-        
-        self.voice_button = AnimatedButton(button_container, "🎤 Voice Input", self.start_voice_input, 
-                                         width=120, height=35, bg="#1e1e2e")  # Base
-        self.voice_button.pack(side='right')
+        # Send button
+        send_btn = tk.Button(input_row, text="➤", bg="#89b4fa", fg="#1e1e2e",
+                            font=("JetBrains Mono", 14, "bold"), relief='flat', bd=0,
+                            command=self.send_message, padx=15, pady=8)
+        send_btn.pack(side='right', padx=10)
     
     def show_placeholder(self, event=None):
-        if not self.input_field.get("1.0", tk.END).strip():
-            self.input_field.delete("1.0", tk.END)
-            self.input_field.insert("1.0", self.input_placeholder)
+        if not self.input_field.get().strip():  # Changed for Entry widget
+            self.input_field.delete(0, tk.END)
+            self.input_field.insert(0, self.input_placeholder)
             self.input_field.configure(fg="#6c7086")  # Catppuccin Overlay0
     
     def hide_placeholder(self, event=None):
-        if self.input_field.get("1.0", tk.END).strip() == self.input_placeholder:
-            self.input_field.delete("1.0", tk.END)
+        if self.input_field.get().strip() == self.input_placeholder:  # Changed for Entry widget
+            self.input_field.delete(0, tk.END)
             self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
     
     def handle_enter_key(self, event):
