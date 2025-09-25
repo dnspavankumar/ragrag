@@ -1,5 +1,6 @@
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import messagebox
 import threading
 import speech_recognition as sr
 import pyttsx3
@@ -7,66 +8,20 @@ from RAG_Gmail import load_emails, ask_question
 import time
 import random
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+from PIL import Image, ImageTk
+import io
+import numpy as np
+
+# Set CustomTkinter appearance
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 print("Starting application...")  # Debug print
 
-class AnimatedButton(tk.Canvas):
-    def __init__(self, parent, text, command, width=120, height=35, **kwargs):
-        super().__init__(parent, width=width, height=height, highlightthickness=0, **kwargs)
-        self.command = command
-        self.text = text
-        self.width = width
-        self.height = height
-        
-        # Catppuccin Mocha Colors
-        self.bg_normal = "#313244"  # Surface0
-        self.bg_hover = "#45475a"   # Surface1
-        self.bg_active = "#585b70"  # Surface2
-        self.text_color = "#cdd6f4" # Text
-        self.border_color = "#6c7086" # Overlay0
-        
-        self.configure(bg=self.bg_normal)
-        self.create_button()
-        
-        # Bind events
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self.bind("<Button-1>", self.on_click)
-        self.bind("<ButtonRelease-1>", self.on_release)
-    
-    def create_button(self):
-        self.delete("all")
-        # Draw rounded rectangle background
-        self.create_rectangle(1, 1, self.width-1, self.height-1, 
-                            fill=self.bg_normal, outline=self.border_color, width=1)
-        # Draw text
-        self.create_text(self.width//2, self.height//2, text=self.text, 
-                        fill=self.text_color, font=("JetBrains Mono", 10, "bold"))
-    
-    def on_enter(self, event):
-        self.configure(bg=self.bg_hover)
-        self.delete("all")
-        self.create_rectangle(1, 1, self.width-1, self.height-1, 
-                            fill=self.bg_hover, outline="#606060", width=1)
-        self.create_text(self.width//2, self.height//2, text=self.text, 
-                        fill=self.text_color, font=("JetBrains Mono", 10, "bold"))
-    
-    def on_leave(self, event):
-        self.configure(bg=self.bg_normal)
-        self.create_button()
-    
-    def on_click(self, event):
-        self.configure(bg=self.bg_active)
-        self.delete("all")
-        self.create_rectangle(1, 1, self.width-1, self.height-1, 
-                            fill=self.bg_active, outline="#707070", width=1)
-        self.create_text(self.width//2, self.height//2, text=self.text, 
-                        fill=self.text_color, font=("JetBrains Mono", 10, "bold"))
-    
-    def on_release(self, event):
-        if self.command:
-            self.command()
-        self.on_enter(event)
+# CustomTkinter handles modern styling automatically, so we can remove the AnimatedButton class
 
 class VoiceThread(threading.Thread):
     def __init__(self, callback):
@@ -90,47 +45,50 @@ class VoiceThread(threading.Thread):
 
 
 
-class MessageBubble(tk.Frame):
+class MessageBubble(ctk.CTkFrame):
     def __init__(self, parent, text, is_user=True, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.configure(bg="#1e1e2e")  # Base
+        # Get color palette from parent
+        colors = parent.master.master.colors if hasattr(parent.master.master, 'colors') else {
+            'primary': '#89B4FA', 'secondary': '#313244', 'background': '#1E1E2E', 
+            'text': '#CDD6F4', 'accent': '#F38BA8'
+        }
         
-        # Create container for proper alignment
-        container = tk.Frame(self, bg="#1e1e2e")  # Base
-        container.pack(fill='x', pady=5)
+        super().__init__(parent, fg_color="transparent", **kwargs)
         
-        # Message content frame with consistent width but dynamic height
+        # Create main container that fills width
+        main_container = ctk.CTkFrame(self, fg_color="transparent")
+        main_container.pack(fill='x', pady=5, padx=15)
+        
         if is_user:
-            # User message - right aligned, Catppuccin blue theme
-            msg_frame = tk.Frame(container, bg="#89b4fa", width=500)  # Fixed width, dynamic height
-            msg_frame.pack(side='right', anchor='e', padx=(100, 10), pady=5)
-            msg_frame.pack_propagate(False)  # Maintain fixed width only
-            text_color = "#1e1e2e"  # Base (dark text on light background)
-            font_config = ("JetBrains Mono", 12, "bold")
-            wrap_length = 450
+            # User message - RIGHT aligned with accent color (red/pink)
+            # Create right-aligned container
+            right_container = ctk.CTkFrame(main_container, fg_color="transparent")
+            right_container.pack(fill='x')
+            
+            msg_frame = ctk.CTkFrame(right_container, fg_color=colors['accent'], corner_radius=15)
+            msg_frame.pack(side='right', padx=(80, 0), pady=5)
+            
+            text_color = colors['background']
+            font_config = ("JetBrains Mono", 12, "normal")
+            wrap_length = 350
         else:
-            # Assistant message - left aligned, blue theme with consistent width
-            msg_frame = tk.Frame(container, bg="#89b4fa", width=600)  # Fixed width, dynamic height
-            msg_frame.pack(side='left', anchor='w', padx=(10, 50), pady=5)
-            msg_frame.pack_propagate(False)  # Maintain fixed width only
-            text_color = "#ffffff"  # White text on blue background
-            font_config = ("JetBrains Mono", 13, "bold")  # Larger and bold for AI responses
-            wrap_length = 550
+            # Assistant message - LEFT aligned with primary color (blue)
+            # Create left-aligned container
+            left_container = ctk.CTkFrame(main_container, fg_color="transparent")
+            left_container.pack(fill='x')
+            
+            msg_frame = ctk.CTkFrame(left_container, fg_color=colors['primary'], corner_radius=15)
+            msg_frame.pack(side='left', padx=(0, 80), pady=5)
+            
+            text_color = colors['background']
+            font_config = ("JetBrains Mono", 13, "normal")
+            wrap_length = 400
         
-        # Create inner frame for proper text sizing
-        inner_frame = tk.Frame(msg_frame, bg=msg_frame['bg'])
-        inner_frame.pack(fill='both', expand=True, padx=15, pady=10)
-        
-        # Message text with consistent wrapping
-        msg_label = tk.Label(inner_frame, text=text, bg=msg_frame['bg'], 
-                           fg=text_color, font=font_config, 
-                           wraplength=wrap_length, justify='left', anchor='nw')
-        msg_label.pack(anchor='nw')
-        
-        # Update frame height to fit content
-        msg_frame.update_idletasks()
-        required_height = inner_frame.winfo_reqheight() + 20  # Add padding
-        msg_frame.configure(height=max(50, required_height))
+        # Message text with proper wrapping
+        msg_label = ctk.CTkLabel(msg_frame, text=text, text_color=text_color, 
+                               font=font_config, wraplength=wrap_length, 
+                               justify='left', anchor='nw')
+        msg_label.pack(padx=18, pady=12, anchor='nw')
 
 class GmailAssistantUI:
     def __init__(self, root):
@@ -138,13 +96,41 @@ class GmailAssistantUI:
         self.root = root
         self.root.title("Gmail Assistant")
         self.root.geometry("1400x800")  # Increased width for sidebar
-        self.root.configure(bg="#1e1e2e")  # Catppuccin Base
+        
+        # Define consistent color palette
+        self.colors = {
+            # Primary colors
+            'background': '#1E1E2E',      # Main background
+            'primary': '#89B4FA',         # Primary blue
+            'secondary': '#313244',       # Secondary dark
+            'accent': '#F38BA8',          # Accent pink
+            
+            # Text colors
+            'text': '#CDD6F4',           # Primary text
+            'text_muted': '#6C7086',     # Muted text
+            'text_success': '#A6E3A1',   # Success green
+            'text_warning': '#F9E2AF',   # Warning yellow
+            'text_error': '#F38BA8',     # Error (same as accent)
+            
+            # Surface colors
+            'surface': '#45475A',        # Cards/containers
+            'surface_variant': '#585B70', # Hover states
+            'surface_dim': '#313244',    # Dimmed surfaces
+            
+            # Interactive states
+            'hover': '#7AA3F0',          # Primary hover
+            'active': '#6C96ED',         # Primary active
+            'disabled': '#6C7086',       # Disabled state
+        }
         
         # Initialize variables
         self.messages = None
         self.new_conversation = True
         self.engine = pyttsx3.init()
         self.is_listening = False
+        self.sidebar_collapsed = False
+        self.sidebar_width = 350
+        self.collapsed_width = 60
         
         # Configure style
         self.setup_styles()
@@ -169,86 +155,104 @@ class GmailAssistantUI:
         
         print("GmailAssistantUI initialized successfully")  # Debug print
         
-        # Bind Enter key to send message (Ctrl+Enter for newline)
+        # Bind Enter key to send message
         self.input_field.bind("<Return>", self.handle_enter_key)
-        self.input_field.bind("<Control-Return>", lambda e: self.input_field.insert(tk.INSERT, '\n'))
+        
+        # No entrance animation needed
     
     def setup_styles(self):
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configure Catppuccin theme colors
-        style.configure("Dark.TFrame", background="#1e1e2e")  # Base
-        style.configure("Header.TFrame", background="#313244")  # Surface0
-        style.configure("Chat.TFrame", background="#1e1e2e")  # Base
-        
-        # Configure fonts with JetBrains Mono
-        self.title_font = ("JetBrains Mono", 18, "bold")
-        self.subtitle_font = ("JetBrains Mono", 11, "bold")
-        self.chat_font_user = ("JetBrains Mono", 12, "bold")
-        self.chat_font_ai = ("JetBrains Mono", 13, "bold")  # Larger and bold for AI responses
-        self.input_font = ("JetBrains Mono", 12, "normal")
+        # Configure modern fonts with better sizing and spacing
+        self.title_font = ("JetBrains Mono", 22, "bold")  # Larger title
+        self.subtitle_font = ("JetBrains Mono", 14, "normal")  # Better subtitle
+        self.header_font = ("JetBrains Mono", 16, "bold")  # Section headers
+        self.chat_font_user = ("JetBrains Mono", 14, "normal")  # User messages
+        self.chat_font_ai = ("JetBrains Mono", 15, "normal")  # AI responses
+        self.input_font = ("JetBrains Mono", 14, "normal")  # Input field
+        self.balance_font = ("JetBrains Mono", 18, "bold")  # Balance display
+        self.task_font = ("JetBrains Mono", 12, "normal")  # Task items
     
     def create_header(self):
-        # Header frame
-        header_frame = tk.Frame(self.root, bg="#313244", height=60)  # Surface0
+        # Modern header with consistent color palette
+        header_frame = ctk.CTkFrame(self.root, fg_color=self.colors['secondary'], height=80)
         header_frame.pack(fill='x', side='top')
         header_frame.pack_propagate(False)
         
-        # Header content
-        header_content = tk.Frame(header_frame, bg="#313244")  # Surface0
+        # Header content with generous padding
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
         header_content.pack(expand=True, fill='both')
         
-        # Title
-        title_label = tk.Label(header_content, text="Gmail Assistant", 
-                              bg="#313244", fg="#cdd6f4", font=self.title_font)  # Surface0, Text
-        title_label.pack(side='left', padx=20, pady=15)
+        # Title with consistent colors
+        title_label = ctk.CTkLabel(header_content, text="Gmail Assistant", 
+                                  text_color=self.colors['text'], font=self.title_font)
+        title_label.pack(side='left', padx=30, pady=20)
         
-        # Status indicator
-        self.status_label = tk.Label(header_content, text="● Ready", 
-                                   bg="#313244", fg="#a6e3a1", font=self.subtitle_font)  # Surface0, Green
-        self.status_label.pack(side='left', padx=(0, 20), pady=15)
+        # Status indicator with success color
+        self.status_label = ctk.CTkLabel(header_content, text="● Ready", 
+                                        text_color=self.colors['text_success'], font=self.subtitle_font)
+        self.status_label.pack(side='left', padx=(0, 30), pady=20)
         
-        # New chat button in header
-        new_chat_btn = AnimatedButton(header_content, "New Chat", self.start_new_chat, 
-                                    width=80, height=30, bg="#313244")  # Surface0
-        new_chat_btn.pack(side='right', padx=20, pady=15)
+        # Modern new chat button with consistent palette
+        new_chat_btn = ctk.CTkButton(header_content, text="+ New Chat", 
+                                    fg_color=self.colors['surface'], text_color=self.colors['text'],
+                                    font=("JetBrains Mono", 12, "bold"),
+                                    corner_radius=10, width=130, height=42,
+                                    hover_color=self.colors['surface_variant'],
+                                    command=self.start_new_chat)
+        new_chat_btn.pack(side='right', padx=30, pady=20)
     
     def create_main_container(self):
         # Main container that holds sidebar and chat area
-        self.main_container = tk.Frame(self.root, bg="#1e1e2e")
+        self.main_container = ctk.CTkFrame(self.root, fg_color="transparent")
         self.main_container.pack(expand=True, fill='both')
         
         # Create right side container for chat + input
-        self.right_container = tk.Frame(self.main_container, bg="#1e1e2e")
+        self.right_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.right_container.pack(side='right', expand=True, fill='both')
     
     def create_sidebar(self):
-        # Sidebar frame
-        sidebar = tk.Frame(self.main_container, bg="#313244", width=350)
-        sidebar.pack(side='left', fill='y', padx=(0, 1))
-        sidebar.pack_propagate(False)
+        # Modern sidebar frame with consistent colors
+        self.sidebar = ctk.CTkFrame(self.main_container, fg_color=self.colors['secondary'], width=self.sidebar_width, corner_radius=0)
+        self.sidebar.pack(side='left', fill='y', padx=(0, 2))
+        self.sidebar.pack_propagate(False)
+        
+        # Sidebar header with consistent palette
+        sidebar_header = ctk.CTkFrame(self.sidebar, fg_color=self.colors['surface'], corner_radius=0, height=50)
+        sidebar_header.pack(fill='x', pady=(0, 1))
+        sidebar_header.pack_propagate(False)
+        
+        # Toggle button with consistent colors
+        self.toggle_btn = ctk.CTkButton(sidebar_header, text="☰", width=40, height=30,
+                                       fg_color="transparent", text_color=self.colors['text'],
+                                       font=("JetBrains Mono", 16, "bold"),
+                                       hover_color=self.colors['surface_variant'], corner_radius=8,
+                                       command=self.toggle_sidebar)
+        self.toggle_btn.pack(side='left', padx=10, pady=10)
+        
+        # Sidebar title with consistent text color
+        self.sidebar_title = ctk.CTkLabel(sidebar_header, text="Dashboard", 
+                                         text_color=self.colors['text'], font=("JetBrains Mono", 14, "bold"))
+        self.sidebar_title.pack(side='left', padx=(10, 0), pady=10)
         
         # Sidebar content with proper scrolling
-        self.sidebar_canvas = tk.Canvas(sidebar, bg="#313244", highlightthickness=0)
-        self.sidebar_frame = tk.Frame(self.sidebar_canvas, bg="#313244")
+        self.sidebar_canvas = tk.Canvas(self.sidebar, bg=self.colors['secondary'], highlightthickness=0)
+        self.sidebar_frame = ctk.CTkFrame(self.sidebar_canvas, fg_color="transparent")
         
-        # Pack canvas without visible scrollbar
-        self.sidebar_canvas.pack(fill="both", expand=True, padx=10, pady=10)
+        # Pack canvas to fill remaining space after header
+        self.sidebar_canvas.pack(fill="both", expand=True, padx=5, pady=(0, 5))
         
         # Create window in canvas
         self.sidebar_window = self.sidebar_canvas.create_window((0, 0), window=self.sidebar_frame, anchor="nw")
         
-        # Financial Overview Section
+        # Financial Overview Section (make it more compact)
         self.create_financial_section(self.sidebar_frame)
         
-        # Task Checklist Section
+        # Task Checklist Section (make it more compact)
         self.create_task_section(self.sidebar_frame)
         
         # Bind events for proper scrolling
         self.sidebar_frame.bind('<Configure>', self.on_sidebar_frame_configure)
         self.sidebar_canvas.bind('<Configure>', self.on_sidebar_canvas_configure)
-        self.sidebar_canvas.bind_all("<MouseWheel>", self.on_sidebar_mousewheel)
+        self.sidebar_canvas.bind("<MouseWheel>", self.on_sidebar_mousewheel)
     
     def on_sidebar_frame_configure(self, event):
         self.sidebar_canvas.configure(scrollregion=self.sidebar_canvas.bbox("all"))
@@ -273,111 +277,257 @@ class GmailAssistantUI:
                 
             self.sidebar_canvas.yview_scroll(scroll_direction, "units")
     
+    def create_modern_chart(self, parent, credits, debits, days):
+        """Create a modern Seaborn chart and embed it in the sidebar"""
+        try:
+            # Set up matplotlib/seaborn styling
+            plt.style.use('dark_background')
+            sns.set_palette([self.colors['text_success'], self.colors['accent']])
+            
+            # Create compact figure with dark theme
+            fig, ax = plt.subplots(figsize=(4.2, 2.2), facecolor=self.colors['surface'])
+            ax.set_facecolor(self.colors['surface'])
+            
+            # Prepare data for seaborn
+            data = pd.DataFrame({
+                'Day': days * 2,
+                'Amount': credits + debits,
+                'Type': ['Credits'] * len(days) + ['Debits'] * len(days)
+            })
+            
+            # Create modern bar plot with seaborn
+            sns.barplot(data=data, x='Day', y='Amount', hue='Type', ax=ax,
+                       palette=[self.colors['text_success'], self.colors['accent']],
+                       alpha=0.9, edgecolor='white', linewidth=0.5)
+            
+            # Customize the plot with consistent colors (more compact)
+            ax.set_title('Weekly Overview', 
+                        color=self.colors['text'], fontsize=10, 
+                        fontfamily='monospace', pad=8)
+            
+            ax.set_xlabel('', color=self.colors['text'])
+            ax.set_ylabel('Amount (₹)', color=self.colors['text'], fontsize=9, fontfamily='monospace')
+            
+            # Style the axes
+            ax.tick_params(colors=self.colors['text_muted'], labelsize=8)
+            ax.grid(True, alpha=0.3, color=self.colors['text_muted'], linewidth=0.5)
+            
+            # Format y-axis to show rupees
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'₹{x/1000:.0f}K'))
+            
+            # Style the legend
+            legend = ax.legend(frameon=True, facecolor=self.colors['surface_variant'], 
+                             edgecolor=self.colors['text_muted'], fontsize=8)
+            legend.get_frame().set_alpha(0.9)
+            for text in legend.get_texts():
+                text.set_color(self.colors['text'])
+            
+            # Remove top and right spines
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_color(self.colors['text_muted'])
+            ax.spines['bottom'].set_color(self.colors['text_muted'])
+            
+            # Tight layout
+            plt.tight_layout()
+            
+            # Convert to image
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', facecolor=self.colors['surface'], 
+                       dpi=100, bbox_inches='tight', pad_inches=0.1)
+            buf.seek(0)
+            
+            # Close the figure to free memory
+            plt.close(fig)
+            
+            # Load image and display
+            img = Image.open(buf)
+            
+            # Convert PIL image to PhotoImage and display directly in section
+            photo = ImageTk.PhotoImage(img)
+            
+            # Create label to hold the chart image (more compact)
+            chart_label = ctk.CTkLabel(parent, image=photo, text="")
+            chart_label.image = photo  # Keep a reference
+            chart_label.pack(pady=(5, 10), padx=10)
+            
+        except Exception as e:
+            print(f"Error creating modern chart: {e}")
+            # Fallback to simple text display
+            fallback_container = ctk.CTkFrame(parent, fg_color=self.colors['surface'], corner_radius=12)
+            fallback_container.pack(fill='x', pady=(0, 25))
+            
+            ctk.CTkLabel(fallback_container, 
+                        text="📊 Financial Chart\n(Install matplotlib, seaborn & pandas for enhanced view)",
+                        text_color=self.colors['text'],
+                        font=("JetBrains Mono", 10)).pack(pady=20)
+    
+    def toggle_sidebar(self):
+        """Toggle sidebar collapse/expand instantly"""
+        if self.sidebar_collapsed:
+            # Expand sidebar
+            self.sidebar_collapsed = False
+            self.sidebar.configure(width=self.sidebar_width)
+            self.toggle_btn.configure(text="☰")
+            # Show sidebar content
+            self.sidebar_title.pack(side='left', padx=(10, 0), pady=10)
+            self.show_sidebar_content()
+        else:
+            # Collapse sidebar
+            self.sidebar_collapsed = True
+            self.hide_sidebar_content()
+            self.sidebar_title.pack_forget()
+            self.sidebar.configure(width=self.collapsed_width)
+            self.toggle_btn.configure(text="→")
+    
+
+    
+    def hide_sidebar_content(self):
+        """Hide sidebar content when collapsed"""
+        # Hide all content except toggle button
+        for widget in self.sidebar_frame.winfo_children():
+            widget.pack_forget()
+    
+    def show_sidebar_content(self):
+        """Show sidebar content when expanded"""
+        # Recreate sidebar content
+        self.create_financial_section(self.sidebar_frame)
+        self.create_task_section(self.sidebar_frame)
+        
+        # Update scroll region
+        self.sidebar_frame.update_idletasks()
+        self.sidebar_canvas.configure(scrollregion=self.sidebar_canvas.bbox("all"))
+    
+
+    
     def create_financial_section(self, parent):
-        # Financial Overview Header
-        fin_header = tk.Label(parent, text="Financial Overview", bg="#313244", fg="#cdd6f4",
-                             font=("JetBrains Mono", 14, "bold"))
-        fin_header.pack(anchor='w', pady=(0, 10))
+        # Compact financial section with consistent colors
+        fin_section = ctk.CTkFrame(parent, fg_color=self.colors['surface'], corner_radius=12)
+        fin_section.pack(fill='x', pady=(0, 15), padx=5)
+        
+        # Compact header with consistent palette
+        header_frame = ctk.CTkFrame(fin_section, fg_color="transparent")
+        header_frame.pack(fill='x', padx=15, pady=(10, 5))
+        
+        # Financial icon
+        fin_icon = ctk.CTkLabel(header_frame, text="💰", font=("JetBrains Mono", 16))
+        fin_icon.pack(side='left')
+        
+        fin_header = ctk.CTkLabel(header_frame, text="Financial Overview", text_color=self.colors['text'],
+                                 font=("JetBrains Mono", 14, "bold"))
+        fin_header.pack(side='left', padx=(8, 0))
         
         # Mock financial data (in rupees)
         credits = [25000, 32000, 28000, 41000, 35000, 29000, 38000]
         debits = [18000, 21000, 24000, 22000, 26000, 23000, 25000]
         days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         
-        # Graph canvas
-        graph_canvas = tk.Canvas(parent, width=320, height=200, bg="#45475a", highlightthickness=0)
-        graph_canvas.pack(pady=(0, 20))
+        # Create modern Plotly chart
+        self.create_modern_chart(fin_section, credits, debits, days)
         
-        # Draw simple bar chart
-        max_val = max(max(credits), max(debits))
-        bar_width = 20
-        spacing = 40
-        
-        for i, (credit, debit) in enumerate(zip(credits, debits)):
-            x = 30 + i * spacing
-            
-            # Credit bars (green)
-            credit_height = (credit / max_val) * 120
-            graph_canvas.create_rectangle(x, 170 - credit_height, x + bar_width, 170,
-                                        fill="#a6e3a1", outline="")
-            
-            # Debit bars (red)
-            debit_height = (debit / max_val) * 120
-            graph_canvas.create_rectangle(x + bar_width + 2, 170 - debit_height, 
-                                        x + 2 * bar_width + 2, 170,
-                                        fill="#f38ba8", outline="")
-            
-            # Day labels
-            graph_canvas.create_text(x + bar_width, 185, text=days[i], 
-                                   fill="#cdd6f4", font=("JetBrains Mono", 8))
-        
-        # Legend
-        graph_canvas.create_rectangle(50, 20, 60, 30, fill="#a6e3a1", outline="")
-        graph_canvas.create_text(70, 25, text="Credits", anchor='w', fill="#cdd6f4", 
-                               font=("JetBrains Mono", 8))
-        
-        graph_canvas.create_rectangle(50, 35, 60, 45, fill="#f38ba8", outline="")
-        graph_canvas.create_text(70, 40, text="Debits", anchor='w', fill="#cdd6f4", 
-                               font=("JetBrains Mono", 8))
-        
-        # Balance summary
+        # Balance summary with enhanced styling
         total_credits = sum(credits)
         total_debits = sum(debits)
         balance = total_credits - total_debits
         
-        balance_frame = tk.Frame(parent, bg="#45475a")
-        balance_frame.pack(fill='x', pady=(0, 20))
+        # Compact balance frame with consistent colors
+        balance_frame = ctk.CTkFrame(parent, fg_color=self.colors['surface_variant'], corner_radius=10)
+        balance_frame.pack(fill='x', pady=(5, 15), padx=15)
         
-        tk.Label(balance_frame, text=f"Weekly Balance: ₹{balance:,}", 
-                bg="#45475a", fg="#a6e3a1" if balance > 0 else "#f38ba8",
-                font=("JetBrains Mono", 11, "bold")).pack(pady=10)
+        # Balance icon and text (more compact)
+        balance_container = ctk.CTkFrame(balance_frame, fg_color="transparent")
+        balance_container.pack(fill='x', padx=12, pady=10)
+        
+        # Balance icon
+        balance_icon = ctk.CTkLabel(balance_container, text="💳", font=("JetBrains Mono", 14))
+        balance_icon.pack(side='left')
+        
+        # Balance text with consistent color palette (smaller font)
+        balance_text = ctk.CTkLabel(balance_container, text=f"Balance: ₹{balance:,}", 
+                                   text_color=self.colors['text_success'] if balance > 0 else self.colors['accent'],
+                                   font=("JetBrains Mono", 14, "bold"))
+        balance_text.pack(side='left', padx=(8, 0))
     
     def create_task_section(self, parent):
-        # Task Checklist Header
-        task_header = tk.Label(parent, text="Tasks & Updates", bg="#313244", fg="#cdd6f4",
-                              font=("JetBrains Mono", 14, "bold"))
-        task_header.pack(anchor='w', pady=(0, 10))
+        # Compact task section with consistent colors
+        task_section = ctk.CTkFrame(parent, fg_color=self.colors['surface'], corner_radius=12)
+        task_section.pack(fill='x', pady=(0, 15), padx=5)
         
-        # Task list frame
-        task_frame = tk.Frame(parent, bg="#45475a")
-        task_frame.pack(fill='x', pady=(0, 20))
+        # Compact task header with consistent palette
+        header_frame = ctk.CTkFrame(task_section, fg_color="transparent")
+        header_frame.pack(fill='x', padx=15, pady=(10, 5))
         
-        # Mock tasks
+        # Task icon
+        task_icon = ctk.CTkLabel(header_frame, text="✅", font=("JetBrains Mono", 16))
+        task_icon.pack(side='left')
+        
+        task_header = ctk.CTkLabel(header_frame, text="Tasks & Updates", text_color=self.colors['text'],
+                                  font=("JetBrains Mono", 14, "bold"))
+        task_header.pack(side='left', padx=(8, 0))
+        
+        # Compact task list frame
+        task_frame = ctk.CTkFrame(task_section, fg_color="transparent")
+        task_frame.pack(fill='x', padx=12, pady=(0, 10))
+        
+        # Mock tasks (reduced to 4 for better spacing)
         tasks = [
             ("Portfolio Review", True),
-            ("Update Investment Strategy", False),
-            ("Review Bank Statements", True),
-            ("Tax Document Preparation", False),
-            ("Insurance Policy Review", False),
-            ("Budget Analysis", True)
+            ("Investment Strategy", False),
+            ("Bank Statements", True),
+            ("Budget Analysis", False)
         ]
         
+        # Task icons mapping (updated for reduced tasks)
+        task_icons = {
+            "Portfolio Review": "📊",
+            "Investment Strategy": "📈", 
+            "Bank Statements": "🏦",
+            "Budget Analysis": "💰"
+        }
+        
         for task, completed in tasks:
-            task_row = tk.Frame(task_frame, bg="#45475a")
-            task_row.pack(fill='x', padx=10, pady=5)
+            # Larger task row with better spacing
+            task_row = ctk.CTkFrame(task_frame, 
+                                   fg_color=self.colors['surface_variant'] if not completed else self.colors['surface'], 
+                                   corner_radius=8, height=45)
+            task_row.pack(fill='x', padx=8, pady=5)
+            task_row.pack_propagate(False)
             
-            # Checkbox
-            checkbox = tk.Label(task_row, text="✓" if completed else "☐", 
-                              bg="#45475a", fg="#a6e3a1" if completed else "#6c7086",
-                              font=("JetBrains Mono", 12))
-            checkbox.pack(side='left')
+            # Task icon (larger)
+            icon = task_icons.get(task, "📝")
+            icon_label = ctk.CTkLabel(task_row, text=icon, font=("JetBrains Mono", 16))
+            icon_label.pack(side='left', padx=(12, 8), pady=12)
             
-            # Task text
-            task_label = tk.Label(task_row, text=task, bg="#45475a", 
-                                fg="#6c7086" if completed else "#cdd6f4",
-                                font=("JetBrains Mono", 9))
-            task_label.pack(side='left', padx=(10, 0))
+            # Larger status indicator with consistent colors
+            def create_status_button():
+                btn = ctk.CTkButton(task_row, text="✓" if completed else "○", 
+                                   fg_color=self.colors['text_success'] if completed else self.colors['accent'],
+                                   text_color=self.colors['background'],
+                                   font=("JetBrains Mono", 12, "bold"),
+                                   width=28, height=28, corner_radius=14,
+                                   hover_color=self.colors['primary'] if completed else self.colors['hover'],
+                                   command=lambda: None)
+                return btn
+            
+            status_btn = create_status_button()
+            status_btn.pack(side='right', padx=12, pady=12)
+            
+            # Larger task text with better readability
+            task_label = ctk.CTkLabel(task_row, text=task, 
+                                     text_color=self.colors['text_success'] if completed else self.colors['text'],
+                                     font=("JetBrains Mono", 11, "bold" if completed else "normal"))
+            task_label.pack(side='left', anchor='w', padx=(0, 10), pady=12)
     
 
     
     def create_main_layout(self):
-        # Chat area (inside right container)
-        chat_container = tk.Frame(self.right_container, bg="#1e1e2e")  # Base
-        chat_container.pack(expand=True, fill='both', padx=20, pady=(0, 0))
+        # Modern chat area with rounded corners
+        chat_container = ctk.CTkFrame(self.right_container, fg_color="transparent")
+        chat_container.pack(expand=True, fill='both', padx=25, pady=(0, 0))
         
-        # Custom chat display using Canvas for smooth scrolling (no scrollbar)
-        self.chat_canvas = tk.Canvas(chat_container, bg="#1e1e2e", highlightthickness=0)  # Base
-        self.chat_frame = tk.Frame(self.chat_canvas, bg="#1e1e2e")  # Base
+        # Custom chat display using Canvas for smooth scrolling
+        self.chat_canvas = tk.Canvas(chat_container, bg="#1e1e2e", highlightthickness=0)
+        self.chat_frame = ctk.CTkFrame(self.chat_canvas, fg_color="transparent")
         
         # Pack canvas without scrollbar
         self.chat_canvas.pack(fill="both", expand=True)
@@ -391,50 +541,44 @@ class GmailAssistantUI:
         self.chat_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
     
     def create_input_area(self):
-        # Input container (inside right container only - no overlap with sidebar)
-        input_container = tk.Frame(self.right_container, bg="#1e1e2e", height=80)
-        input_container.pack(fill='x', side='bottom', padx=20, pady=20)
+        # Input container with consistent colors
+        input_container = ctk.CTkFrame(self.right_container, fg_color="transparent", height=100)
+        input_container.pack(fill='x', side='bottom', padx=30, pady=25)
         input_container.pack_propagate(False)
         
-        # Input row with text field and buttons
-        input_row = tk.Frame(input_container, bg="#313244", relief='flat', bd=0)
+        # Input row with consistent palette
+        input_row = ctk.CTkFrame(input_container, fg_color=self.colors['secondary'], corner_radius=12)
         input_row.pack(fill='both', expand=True)
         
-        # Input field (single line style)
-        self.input_field = tk.Entry(input_row, bg="#313244", fg="#cdd6f4", 
-                                   font=("JetBrains Mono", 12), relief='flat', bd=0,
-                                   insertbackground="#cdd6f4")
-        self.input_field.pack(side='left', fill='both', expand=True, padx=20, pady=15)
+        # Input field with consistent colors
+        self.input_field = ctk.CTkEntry(input_row, fg_color="transparent", 
+                                       text_color=self.colors['text'], font=self.input_font,
+                                       border_width=0, placeholder_text="Type your message here...",
+                                       placeholder_text_color=self.colors['text_muted'])
+        self.input_field.pack(side='left', fill='both', expand=True, padx=25, pady=20)
         
-        # Input placeholder
-        self.input_placeholder = "Type your message here..."
-        self.show_placeholder()
-        self.input_field.bind('<FocusIn>', self.hide_placeholder)
-        self.input_field.bind('<FocusOut>', self.show_placeholder)
+        # Bind enter key
         self.input_field.bind('<Return>', self.handle_enter_key)
         
-        # Voice button
-        voice_btn = tk.Button(input_row, text="🎤", bg="#313244", fg="#6c7086",
-                             font=("JetBrains Mono", 14), relief='flat', bd=0,
-                             command=self.start_voice_input, padx=10)
-        voice_btn.pack(side='right', padx=(0, 10))
+        # Voice button with consistent colors
+        voice_btn = ctk.CTkButton(input_row, text="🎤", fg_color="transparent", 
+                                 text_color=self.colors['text_muted'], font=("JetBrains Mono", 16),
+                                 width=50, height=40, corner_radius=10,
+                                 hover_color=self.colors['surface'],
+                                 command=self.start_voice_input)
+        voice_btn.pack(side='right', padx=(0, 15), pady=20)
         
-        # Send button
-        send_btn = tk.Button(input_row, text="➤", bg="#89b4fa", fg="#1e1e2e",
-                            font=("JetBrains Mono", 14, "bold"), relief='flat', bd=0,
-                            command=self.send_message, padx=15, pady=8)
-        send_btn.pack(side='right', padx=10)
+        # Send button with primary color
+        send_btn = ctk.CTkButton(input_row, text="➤", fg_color=self.colors['primary'], 
+                                text_color=self.colors['background'], font=("JetBrains Mono", 16, "bold"),
+                                width=60, height=40, corner_radius=10,
+                                hover_color=self.colors['hover'],
+                                command=self.send_message)
+        send_btn.pack(side='right', padx=15, pady=20)
+        
+
     
-    def show_placeholder(self, event=None):
-        if not self.input_field.get().strip():  # Changed for Entry widget
-            self.input_field.delete(0, tk.END)
-            self.input_field.insert(0, self.input_placeholder)
-            self.input_field.configure(fg="#6c7086")  # Catppuccin Overlay0
-    
-    def hide_placeholder(self, event=None):
-        if self.input_field.get().strip() == self.input_placeholder:  # Changed for Entry widget
-            self.input_field.delete(0, tk.END)
-            self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
+    # CustomTkinter Entry handles placeholder automatically, so we can remove these methods
     
     def handle_enter_key(self, event):
         if event.state & 4:  # Ctrl key is pressed
@@ -472,18 +616,19 @@ class GmailAssistantUI:
         bubble = MessageBubble(self.chat_frame, text, is_user)
         bubble.pack(fill='x', padx=10, pady=2)
         
-        # Auto scroll to bottom
+        # Simple scroll to bottom
         self.root.after(10, lambda: self.chat_canvas.yview_moveto(1.0))
     
     def update_status(self, status, color="#a6e3a1"):  # Catppuccin Green
         # Map common status colors to Catppuccin equivalents
         color_map = {
-            "#4ade80": "#a6e3a1",  # Green
-            "#fbbf24": "#f9e2af",  # Yellow  
-            "#ef4444": "#f38ba8"   # Red
+            "#4ade80": self.colors['text_success'],  # Green
+            "#fbbf24": self.colors['text_warning'],  # Yellow  
+            "#ef4444": self.colors['text_error']     # Red
         }
         catppuccin_color = color_map.get(color, color)
-        self.status_label.configure(text=f"● {status}", fg=catppuccin_color)
+        # Use text_color instead of fg for CustomTkinter compatibility
+        self.status_label.configure(text=f"● {status}", text_color=catppuccin_color)
         self.root.update()
     
     def load_initial_emails(self):
@@ -500,18 +645,18 @@ class GmailAssistantUI:
             self.update_status("Error loading emails", "#ef4444")
     
     def send_message(self):
-        query = self.input_field.get("1.0", tk.END).strip()
-        if not query or query == self.input_placeholder:
+        query = self.input_field.get().strip()
+        if not query:
             return
         
-        # Hide placeholder and clear input
-        self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
+        # Add message immediately
         self.add_message_bubble(query, True)
-        self.input_field.delete("1.0", tk.END)
-        self.show_placeholder()
         
-        # Update status
-        self.update_status("Thinking...", "#fbbf24")
+        # Clear input field immediately
+        self.input_field.delete(0, 'end')
+        
+        # Update status in title
+        self.root.title("Gmail Assistant - Thinking...")
         
         # Process query in thread to avoid blocking UI
         threading.Thread(target=self.process_query, args=(query,), daemon=True).start()
@@ -524,17 +669,21 @@ class GmailAssistantUI:
             else:
                 self.messages, response = ask_question(query, messages=self.messages)
             
-            # Update UI in main thread
+            # Add response immediately
             self.root.after(0, lambda: self.add_message_bubble(response, False))
-            self.root.after(0, lambda: self.update_status("Ready"))
+            
+            # Reset title immediately
+            self.root.after(0, lambda: self.root.title("Gmail Assistant"))
             
             # Use a thread for text-to-speech to avoid blocking
             threading.Thread(target=self.speak_text, args=(response,), daemon=True).start()
             
         except Exception as e:
             print(f"Error processing query: {str(e)}")  # Debug print
+            
+            # Add error message immediately
             self.root.after(0, lambda: self.add_message_bubble(f"Error: {str(e)}", False))
-            self.root.after(0, lambda: self.update_status("Error", "#ef4444"))
+            self.root.after(0, lambda: self.root.title("Gmail Assistant - Error"))
     
     def speak_text(self, text):
         try:
@@ -548,23 +697,21 @@ class GmailAssistantUI:
             return
             
         self.is_listening = True
-        self.voice_button.text = "Listening..."
-        self.voice_button.create_button()
-        self.update_status("Listening...", "#fbbf24")
+        # Update title to show listening status
+        self.root.title("Gmail Assistant - Listening...")
         
         def voice_callback(query):
             self.is_listening = False
-            self.voice_button.text = "🎤 Voice Input"
-            self.voice_button.create_button()
-            self.update_status("Ready")
+            self.root.title("Gmail Assistant")  # Reset title
             
             if query:
-                self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
-                self.input_field.delete("1.0", tk.END)
-                self.input_field.insert("1.0", query)
+                self.input_field.delete(0, 'end')
+                self.input_field.insert(0, query)
                 self.send_message()
         
         VoiceThread(voice_callback).start()
+    
+
     
     def start_new_chat(self):
         self.new_conversation = True
@@ -580,12 +727,9 @@ class GmailAssistantUI:
 
 def main():
     print("Starting main function...")  # Debug print
-    root = tk.Tk()
+    root = ctk.CTk()
     
-    # Set window icon and properties
-    # root.wm_attributes('-type', 'dialog')  # Not supported on Windows
-    
-    print("Tk root created")  # Debug print
+    print("CustomTkinter root created")  # Debug print
     app = GmailAssistantUI(root)
     print("Window created")  # Debug print
     
