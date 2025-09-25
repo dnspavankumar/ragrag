@@ -1,0 +1,15 @@
+beautifulsoup4
+python-dateutil
+python-dotenv
+faiss-cpu
+numpy
+pyttsx3
+SpeechRecognition
+tzlocal
+google-auth-oauthlib
+google-api-python-client
+langchain
+groq
+PyQt6
+google-auth-httplib2
+chime
