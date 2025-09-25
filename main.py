@@ -16,12 +16,12 @@ class AnimatedButton(tk.Canvas):
         self.width = width
         self.height = height
         
-        # Colors
-        self.bg_normal = "#2d2d30"
-        self.bg_hover = "#404040"
-        self.bg_active = "#505050"
-        self.text_color = "#ffffff"
-        self.border_color = "#404040"
+        # Catppuccin Mocha Colors
+        self.bg_normal = "#313244"  # Surface0
+        self.bg_hover = "#45475a"   # Surface1
+        self.bg_active = "#585b70"  # Surface2
+        self.text_color = "#cdd6f4" # Text
+        self.border_color = "#6c7086" # Overlay0
         
         self.configure(bg=self.bg_normal)
         self.create_button()
@@ -91,29 +91,44 @@ class VoiceThread(threading.Thread):
 class MessageBubble(tk.Frame):
     def __init__(self, parent, text, is_user=True, **kwargs):
         super().__init__(parent, **kwargs)
-        self.configure(bg="#1e1e1e")
+        self.configure(bg="#1e1e2e")  # Base
         
         # Create container for proper alignment
-        container = tk.Frame(self, bg="#1e1e1e")
+        container = tk.Frame(self, bg="#1e1e2e")  # Base
         container.pack(fill='x', pady=5)
         
-        # Message content frame
+        # Message content frame with consistent width but dynamic height
         if is_user:
-            # User message - right aligned, blue theme
-            msg_frame = tk.Frame(container, bg="#2d5aa0", padx=15, pady=10)
-            msg_frame.pack(side='right', anchor='e', padx=(100, 10))
-            text_color = "#ffffff"
+            # User message - right aligned, Catppuccin blue theme
+            msg_frame = tk.Frame(container, bg="#89b4fa", width=500)  # Fixed width, dynamic height
+            msg_frame.pack(side='right', anchor='e', padx=(100, 10), pady=5)
+            msg_frame.pack_propagate(False)  # Maintain fixed width only
+            text_color = "#1e1e2e"  # Base (dark text on light background)
+            font_config = ("JetBrains Mono", 12, "bold")
+            wrap_length = 450
         else:
-            # Assistant message - left aligned, dark theme  
-            msg_frame = tk.Frame(container, bg="#2d2d30", padx=15, pady=10)
-            msg_frame.pack(side='left', anchor='w', padx=(10, 100))
-            text_color = "#e0e0e0"
+            # Assistant message - left aligned, blue theme with consistent width
+            msg_frame = tk.Frame(container, bg="#89b4fa", width=600)  # Fixed width, dynamic height
+            msg_frame.pack(side='left', anchor='w', padx=(10, 50), pady=5)
+            msg_frame.pack_propagate(False)  # Maintain fixed width only
+            text_color = "#ffffff"  # White text on blue background
+            font_config = ("JetBrains Mono", 13, "bold")  # Larger and bold for AI responses
+            wrap_length = 550
         
-        # Message text
-        msg_label = tk.Label(msg_frame, text=text, bg=msg_frame['bg'], 
-                           fg=text_color, font=("JetBrains Mono", 12, "normal"), 
-                           wraplength=400, justify='left')
-        msg_label.pack()
+        # Create inner frame for proper text sizing
+        inner_frame = tk.Frame(msg_frame, bg=msg_frame['bg'])
+        inner_frame.pack(fill='both', expand=True, padx=15, pady=10)
+        
+        # Message text with consistent wrapping
+        msg_label = tk.Label(inner_frame, text=text, bg=msg_frame['bg'], 
+                           fg=text_color, font=font_config, 
+                           wraplength=wrap_length, justify='left', anchor='nw')
+        msg_label.pack(anchor='nw')
+        
+        # Update frame height to fit content
+        msg_frame.update_idletasks()
+        required_height = inner_frame.winfo_reqheight() + 20  # Add padding
+        msg_frame.configure(height=max(50, required_height))
 
 class GmailAssistantUI:
     def __init__(self, root):
@@ -121,7 +136,7 @@ class GmailAssistantUI:
         self.root = root
         self.root.title("Gmail Assistant")
         self.root.geometry("1000x700")
-        self.root.configure(bg="#1e1e1e")
+        self.root.configure(bg="#1e1e2e")  # Catppuccin Base
         
         # Initialize variables
         self.messages = None
@@ -154,54 +169,55 @@ class GmailAssistantUI:
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Configure dark theme colors
-        style.configure("Dark.TFrame", background="#1e1e1e")
-        style.configure("Header.TFrame", background="#2d2d30")
-        style.configure("Chat.TFrame", background="#1e1e1e")
+        # Configure Catppuccin theme colors
+        style.configure("Dark.TFrame", background="#1e1e2e")  # Base
+        style.configure("Header.TFrame", background="#313244")  # Surface0
+        style.configure("Chat.TFrame", background="#1e1e2e")  # Base
         
         # Configure fonts with JetBrains Mono
         self.title_font = ("JetBrains Mono", 18, "bold")
         self.subtitle_font = ("JetBrains Mono", 11, "bold")
-        self.chat_font = ("JetBrains Mono", 12, "normal")
+        self.chat_font_user = ("JetBrains Mono", 12, "bold")
+        self.chat_font_ai = ("JetBrains Mono", 13, "bold")  # Larger and bold for AI responses
         self.input_font = ("JetBrains Mono", 12, "normal")
     
     def create_header(self):
         # Header frame
-        header_frame = tk.Frame(self.root, bg="#2d2d30", height=60)
+        header_frame = tk.Frame(self.root, bg="#313244", height=60)  # Surface0
         header_frame.pack(fill='x', side='top')
         header_frame.pack_propagate(False)
         
         # Header content
-        header_content = tk.Frame(header_frame, bg="#2d2d30")
+        header_content = tk.Frame(header_frame, bg="#313244")  # Surface0
         header_content.pack(expand=True, fill='both')
         
         # Title
         title_label = tk.Label(header_content, text="Gmail Assistant", 
-                              bg="#2d2d30", fg="#ffffff", font=self.title_font)
+                              bg="#313244", fg="#cdd6f4", font=self.title_font)  # Surface0, Text
         title_label.pack(side='left', padx=20, pady=15)
         
         # Status indicator
         self.status_label = tk.Label(header_content, text="● Ready", 
-                                   bg="#2d2d30", fg="#4ade80", font=self.subtitle_font)
+                                   bg="#313244", fg="#a6e3a1", font=self.subtitle_font)  # Surface0, Green
         self.status_label.pack(side='left', padx=(0, 20), pady=15)
         
         # New chat button in header
         new_chat_btn = AnimatedButton(header_content, "New Chat", self.start_new_chat, 
-                                    width=80, height=30, bg="#2d2d30")
+                                    width=80, height=30, bg="#313244")  # Surface0
         new_chat_btn.pack(side='right', padx=20, pady=15)
     
     def create_main_layout(self):
         # Main container
-        main_container = tk.Frame(self.root, bg="#1e1e1e")
+        main_container = tk.Frame(self.root, bg="#1e1e2e")  # Base
         main_container.pack(expand=True, fill='both', padx=20, pady=(0, 20))
         
         # Chat area
-        chat_container = tk.Frame(main_container, bg="#1e1e1e")
+        chat_container = tk.Frame(main_container, bg="#1e1e2e")  # Base
         chat_container.pack(expand=True, fill='both', pady=(0, 20))
         
         # Custom chat display using Canvas for smooth scrolling (no scrollbar)
-        self.chat_canvas = tk.Canvas(chat_container, bg="#1e1e1e", highlightthickness=0)
-        self.chat_frame = tk.Frame(self.chat_canvas, bg="#1e1e1e")
+        self.chat_canvas = tk.Canvas(chat_container, bg="#1e1e2e", highlightthickness=0)  # Base
+        self.chat_frame = tk.Frame(self.chat_canvas, bg="#1e1e2e")  # Base
         
         # Pack canvas without scrollbar
         self.chat_canvas.pack(fill="both", expand=True)
@@ -216,18 +232,18 @@ class GmailAssistantUI:
     
     def create_input_area(self):
         # Input container
-        input_container = tk.Frame(self.root, bg="#1e1e1e", height=120)
+        input_container = tk.Frame(self.root, bg="#1e1e2e", height=120)  # Base
         input_container.pack(fill='x', side='bottom', padx=20, pady=(0, 20))
         input_container.pack_propagate(False)
         
         # Input frame with border
-        input_frame = tk.Frame(input_container, bg="#2d2d30", relief='solid', bd=1)
+        input_frame = tk.Frame(input_container, bg="#313244", relief='solid', bd=1)  # Surface0
         input_frame.pack(fill='both', expand=True, ipady=2)
         
         # Input field
         self.input_field = tk.Text(input_frame, wrap=tk.WORD, height=3, 
-                                 bg="#2d2d30", fg="#ffffff", font=self.input_font,
-                                 insertbackground="#ffffff", relief='flat', bd=10)
+                                 bg="#313244", fg="#cdd6f4", font=self.input_font,  # Surface0, Text
+                                 insertbackground="#cdd6f4", relief='flat', bd=10)  # Text cursor
         self.input_field.pack(fill='both', expand=True, padx=10, pady=10)
         
         # Input field placeholder
@@ -237,28 +253,28 @@ class GmailAssistantUI:
         self.input_field.bind('<FocusOut>', self.show_placeholder)
         
         # Button container
-        button_container = tk.Frame(input_container, bg="#1e1e1e")
+        button_container = tk.Frame(input_container, bg="#1e1e2e")  # Base
         button_container.pack(fill='x', pady=(10, 0))
         
         # Buttons with modern styling
         self.send_button = AnimatedButton(button_container, "Send Message", self.send_message, 
-                                        width=120, height=35, bg="#1e1e1e")
+                                        width=120, height=35, bg="#1e1e2e")  # Base
         self.send_button.pack(side='right', padx=(10, 0))
         
         self.voice_button = AnimatedButton(button_container, "🎤 Voice Input", self.start_voice_input, 
-                                         width=120, height=35, bg="#1e1e1e")
+                                         width=120, height=35, bg="#1e1e2e")  # Base
         self.voice_button.pack(side='right')
     
     def show_placeholder(self, event=None):
         if not self.input_field.get("1.0", tk.END).strip():
             self.input_field.delete("1.0", tk.END)
             self.input_field.insert("1.0", self.input_placeholder)
-            self.input_field.configure(fg="#808080")
+            self.input_field.configure(fg="#6c7086")  # Catppuccin Overlay0
     
     def hide_placeholder(self, event=None):
         if self.input_field.get("1.0", tk.END).strip() == self.input_placeholder:
             self.input_field.delete("1.0", tk.END)
-            self.input_field.configure(fg="#ffffff")
+            self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
     
     def handle_enter_key(self, event):
         if event.state & 4:  # Ctrl key is pressed
@@ -299,8 +315,15 @@ class GmailAssistantUI:
         # Auto scroll to bottom
         self.root.after(10, lambda: self.chat_canvas.yview_moveto(1.0))
     
-    def update_status(self, status, color="#4ade80"):
-        self.status_label.configure(text=f"● {status}", fg=color)
+    def update_status(self, status, color="#a6e3a1"):  # Catppuccin Green
+        # Map common status colors to Catppuccin equivalents
+        color_map = {
+            "#4ade80": "#a6e3a1",  # Green
+            "#fbbf24": "#f9e2af",  # Yellow  
+            "#ef4444": "#f38ba8"   # Red
+        }
+        catppuccin_color = color_map.get(color, color)
+        self.status_label.configure(text=f"● {status}", fg=catppuccin_color)
         self.root.update()
     
     def load_initial_emails(self):
@@ -322,7 +345,7 @@ class GmailAssistantUI:
             return
         
         # Hide placeholder and clear input
-        self.input_field.configure(fg="#ffffff")
+        self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
         self.add_message_bubble(query, True)
         self.input_field.delete("1.0", tk.END)
         self.show_placeholder()
@@ -376,7 +399,7 @@ class GmailAssistantUI:
             self.update_status("Ready")
             
             if query:
-                self.input_field.configure(fg="#ffffff")
+                self.input_field.configure(fg="#cdd6f4")  # Catppuccin Text
                 self.input_field.delete("1.0", tk.END)
                 self.input_field.insert("1.0", query)
                 self.send_message()
