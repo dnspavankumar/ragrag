@@ -65,7 +65,7 @@ Please summarize this email according to the format above.
 '''
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="meta-llama/llama-4-maverick-17b-128e-instruct",
             messages=[
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": prompt}
