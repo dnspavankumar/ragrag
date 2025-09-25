@@ -1,15 +1,29 @@
-beautifulsoup4
-python-dateutil
-python-dotenv
-faiss-cpu
+# Core GUI and Interface
+customtkinter
+pillow
+
+# Data Processing and Analysis
 numpy
-pyttsx3
-SpeechRecognition
-tzlocal
+pandas
+matplotlib
+seaborn
+
+# Email and Gmail API
 google-auth-oauthlib
 google-api-python-client
-langchain
-groq
-PyQt6
 google-auth-httplib2
+beautifulsoup4
+
+# AI and Language Processing
+groq
+faiss-cpu
+
+# Speech Recognition and TTS
+SpeechRecognition
+pyttsx3
+
+# Utilities
+python-dateutil
+python-dotenv
+tzlocal
 chime
